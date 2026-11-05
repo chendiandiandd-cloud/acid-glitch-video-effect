@@ -1,0 +1,32 @@
+{
+  "profile_id": "acid-reference-42f-color-return-v1",
+  "schema_version": 1,
+  "reference_fps": 8,
+  "frame_count": 42,
+  "duration_seconds": 5.25,
+  "provenance": {
+    "source": "User-uploaded reference; full 42-frame adjacent-frame visual audit",
+    "analysis_url": "https://bytedance.larkoffice.com/docx/T097dzQ2eobp7VxnBhNcMQFqnqd",
+    "audio_stream_count": 0,
+    "frame_states_basis": "Only natural-color/partial-return membership is encoded. strong means no confirmed whole-frame natural return; it does not identify a liquid/glitch preset.",
+    "extension_basis": "Repeating beyond 5.25s is an adaptation policy, not measured behavior",
+    "status": "Analysis grounded; visual recreation not yet accepted"
+  },
+  "natural_color_frames": [0, 2, 14, 17, 34, 38, 41],
+  "return_event_frames": [2, 14, 17, 34, 38, 41],
+  "natural_branch": {
+    "scope": "whole_frame",
+    "source_time": "current_input_pts",
+    "preserve_residual_distress": true,
+    "strong_style_gain": 0.0,
+    "note": "Natural-color return does not prove a completely unprocessed frame. Residual distress requires separate calibration."
+  },
+  "frame_states": [
+    "natural", "strong", "natural", "strong", "strong", "strong", "partial", "strong",
+    "strong", "strong", "strong", "strong", "strong", "strong", "natural", "strong",
+    "strong", "natural", "strong", "strong", "strong", "strong", "partial", "strong",
+    "strong", "partial", "strong", "strong", "strong", "partial", "strong", "strong",
+    "strong", "strong", "natural", "strong", "strong", "strong", "natural", "strong",
+    "strong", "natural"
+  ]
+}
