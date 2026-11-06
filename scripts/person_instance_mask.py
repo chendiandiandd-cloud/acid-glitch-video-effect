@@ -3,8 +3,10 @@ Public Kalray YOLOv8n-seg raw-head export, obtained 2026-11-04:
 https://huggingface.co/Kalray/yolov8n-seg . CPU, all-person union only.
 """
 from pathlib import Path
-import cv2
-import numpy as np
+from runtime_dependencies import check_base, load_native, load_onnxruntime
+check_base()
+cv2 = load_native('cv2')
+np = load_native('numpy')
 
 
 def sigmoid(x):
@@ -13,7 +15,7 @@ def sigmoid(x):
 
 class PersonInstanceMask:
     def __init__(self, model=None):
-        import onnxruntime as ort
+        ort = load_onnxruntime()
         model = model or Path(__file__).resolve().parents[1] / 'models/yolov8n-seg.onnx'
         opts=ort.SessionOptions();opts.intra_op_num_threads=4;opts.inter_op_num_threads=1
         self.session=ort.InferenceSession(str(model),sess_options=opts,providers=['CPUExecutionProvider'])

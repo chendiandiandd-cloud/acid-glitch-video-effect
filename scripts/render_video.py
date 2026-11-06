@@ -13,7 +13,14 @@ import tempfile
 import time
 from collections import defaultdict
 from fractions import Fraction
-import cv2
+from runtime_dependencies import check_base, load_native, require_ffmpeg
+try:
+    check_base()  # metadata only; reject unsupported ABI before native imports
+    cv2 = load_native('cv2')
+except ValueError as e:
+    if __name__ == '__main__':
+        sys.exit('Render failed: ' + str(e))
+    raise
 from acid_test_io import ROOT, probe_source, MaskCache, Decoder, anchor_intervals
 from acid_renderer import FrameEffects
 cv2.setNumThreads(2)
@@ -41,6 +48,7 @@ def render(inp, out, *, start=0, duration=None, model=None, cache_dir=None,
     if segmentation not in ('auto','none','cache-only'):raise ValueError('Unknown segmentation policy')
     if not math.isfinite(float(start)) or (duration is not None and not math.isfinite(float(duration))):
         raise ValueError('Start/duration must be finite')
+    require_ffmpeg()  # PATH lookup only, no extra media or version probe
     meta,width,height,fps,pts=probe_source(inp,start,duration)
     stats['preflight_seconds']=time.perf_counter()-begin
     ts=time.perf_counter()
