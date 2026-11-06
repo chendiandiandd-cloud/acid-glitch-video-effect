@@ -9,7 +9,9 @@
 - 必填input/output；start默认0，duration省略为剩余全片，无4/6秒限制。
 - segmentation默认auto（缓存不足时使用已有轻量人物模型），cache-only禁止推理，none是明确零人物mask策略，不是语义无人检测。
 - model默认包内路径；cache-dir默认系统临时目录acid-mask-cache。默认禁止覆盖输出，overwrite显式开启，不能覆盖输入或输入硬链接。
-- Python>=3.10，NumPy/OpenCV/可选ONNXRuntime见[requirements](../requirements.txt)，FFmpeg/ffprobe>=5需在PATH。包内[已有权重](../models/README.md)13,681,633字节及SHA-256均已记录。没有自动下载。
+- 支持/已验证基线为CPython 3.11、Linux x86_64；其他Python版本（含3.13+）不在当前锁定组合支持范围，不能把旧Python>=3.10理解为所有新版本兼容。NumPy==1.26.4、opencv-python-headless==4.11.0.86、onnxruntime==1.16.3见[requirements](../requirements.txt)。其他OS/架构未做集成验证，须确认原生wheel及系统库支持，不宣称Android/iOS本机可用。
+- 在Skill根目录用 `python3.11 -m venv /path/to/venv` 后，执行 `/path/to/venv/bin/python -m pip install -r requirements.txt`。系统FFmpeg/ffprobe>=5（含libx264）需另装并加入PATH，pip不提供，不自动安装/替换系统。包内[已有权重](../models/README.md)13,681,633字节及SHA-256均已记录，不自动下载。
+- [轻量启动护栏](../scripts/runtime_dependencies.py)在native import前检查Python/基础包锁定版本；真实人物模型创建前再检查ORT，避免旧ORT+NumPy2 ABI崩溃。缺包、native库加载错误、缺FFmpeg给安装指引；只查metadata/PATH，不执行环境完整质检、不探测二进制版本、不写报告。none/cache命中仍不导入ORT。
 - 整包scripts/references/models可复制到任意路径，从任意cwd执行绝对脚本路径；无需工作区scripts或其他Skill。无inner_skills资源打包。
 
 ## 迁移来源（2026-11-06）
@@ -51,13 +53,19 @@
 
 ## 实测验证边界
 
-2026-11-06开发测试只使用临时合成微媒体或数组，不渲染用户视频、不做新分割推理。使用既有合成mask缓存验证24fps CLI和光流；没有本次真实人物模型性能/精度测试。
+2026-11-06迁移基线开发测试只使用临时合成微媒体或数组，不渲染用户视频、不做新分割推理；该阶段使用既有合成mask缓存验证24fps CLI和光流，未测试真实人物模型性能/精度。随后依赖修复验证另述如下。
 
 7秒、64×48、8fps无音轨合成视频：56帧，video_decode_passes=1，frames_decoded=56，wear_flow_calls=55；natural=9，person_print从56降到47，强分支跳过9。背景调用source=5、duotone=11、ink_colorfield=9、horizontal_glitch=8、liquid_replace=14，共47（off为56）。优化on/off处理帧与实际H264解码帧逐像素相等，差异0。独立eager背景oracle也逐像素相等，并验证每state只算所需底层配方。合成非零mask/运动/切镜的24fps数组验证有限前瞻与预解码双锚点oracle相等。
 
 便宜计数/阶段时钟沿用已有实现，不触发额外媒体计算。仅显式--diagnostics构建stdout统计JSON（preflight/cache setup/decode read/cut detection/segmentation/effects/encode write/finalize/total时间，解码pass/帧数、cache hit/miss、推理/flow/print/跳过次数及state调用）；默认只返回output路径，不构建统计报告，不写report/stats文件，已删除output_probe_seconds及整个输出探测。阶段墙时包含pipe等待/并行重叠，不能简单求和当纯CPU成本；frames_decoded计交给Python的帧，input seek内部keyframe preroll不可观察。小媒体计时不用于承诺用户素材速度倍数，未测速或重渲染用户素材。
 
-迁移基线曾通过包内110项测试与工作区10项无媒体回归；本轮仅执行包内开发测试120项（原110项＋[默认路径/异常清理契约](../scripts/test_render_runtime.py)10项），quick_validate通过。新契约用64×48、8fps、0.5秒临时合成媒体证明：输入ffprobe两次（metadata/视频PTS），output postprobe=0、decoder=1、encoder/mux=1；默认不构建统计报告、不写JSON/JPG；diagnostics不追加媒体检查，auto有效缓存源/模型各hash一次且零推理；失败保留原错误、回收进程/pipe/临时目录且不破坏已有输出。24fps/1秒开发CLI仍使用8个合成mask缓存，cache_hit=8、cache_miss=0、model_inferences=0，frames_decoded=24、wear_flow_calls=23、anchor_flow_samples=22、lookahead_peak_frames=4。
+迁移基线曾通过包内110项测试与工作区10项无媒体回归；迁移开发回归执行包内测试120项（原110项＋[默认路径/异常清理契约](../scripts/test_render_runtime.py)10项），quick_validate通过。新契约用64×48、8fps、0.5秒临时合成媒体证明：输入ffprobe两次（metadata/视频PTS），output postprobe=0、decoder=1、encoder/mux=1；默认不构建统计报告、不写JSON/JPG；diagnostics不追加媒体检查，auto有效缓存源/模型各hash一次且零推理；失败保留原错误、回收进程/pipe/临时目录且不破坏已有输出。24fps/1秒开发CLI仍使用8个合成mask缓存，cache_hit=8、cache_miss=0、model_inferences=0，frames_decoded=24、wear_flow_calls=23、anchor_flow_samples=22、lookahead_peak_frames=4。
+
+## 依赖修复验证（2026-11-06）
+
+新建隔离venv（不继承system site-packages），CPython 3.11.15/Linux x86_64，从公开PyPI按requirements安装三项固定主依赖，pip check通过。沿用系统/usr/bin/ffmpeg及ffprobe 5.1.9（libx264），不是pip或venv自动提供。PersonInstanceMask对合成零数组执行detail真实推理成功；64×48、24fps、0.5秒无音轨合成视频完整auto CLI正常退出，12帧、cache_hit=0、cache_miss=4、model_inferences=4（detail每锚点3次forward）。无人物合成mask为零仅证明模型加载/运行，不证明人物精度或全素材美学。
+
+复用旧隔离venv的NumPy2.2.6/OpenCV4.12.0.88/ORT1.16.3坏组合：修复后CLI退出1并给ABI/安装指引，未import numpy/cv2/ORT、未创建native session、无segfault。缺基础包及缺系统FFmpeg给单行友好错误。开发验证通过[依赖护栏单测](../scripts/test_runtime_dependencies.py)9项、默认路径/cleanup单测10项、入口/数组/portable单测18项，共37项；quick_validate及git diff --check通过。默认仍单次渲染、无自动preview/输出质检/报告；模型/视觉算法不改。外部手机平台的仓库读取安装失败仍无原始日志，不能由该运行时修复认定根因或承诺解决。
 
 ## 按需开发测试
 
