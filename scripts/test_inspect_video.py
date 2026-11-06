@@ -43,7 +43,9 @@ class InspectTests(unittest.TestCase):
     def test_metadata_never_extracts(self):
         code, report = self.run_metadata()
         self.assertEqual(code, 0)
-        self.assertEqual(report['render_gate'], 'needs_segmentation_and_visual_validation')
+        self.assertEqual(report['render_gate'], 'input_metadata_ready')
+        self.assertIn('metadata-only needs no contact sheet', report['notes'][1])
+        self.assertNotIn('before rendering', report['notes'][1])
 
     def test_required_mask_missing_blocks(self):
         code, report = self.run_metadata(require_mask=True)

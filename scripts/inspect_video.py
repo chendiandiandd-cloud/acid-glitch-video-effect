@@ -1,4 +1,4 @@
-"""Model-free preflight and contact-sheet extraction; NOT a segmentation/FX renderer.
+"""Explicit development tool: metadata report/contact sheet, never a render prerequisite.
 Original implementation for this skill, 2026-11-04. Uses only stdlib + FFmpeg.
 """
 import argparse
@@ -91,12 +91,11 @@ def main():
         'contact_sheet': str(sheet.resolve()) if sheet is not None else None,
         'metadata_only': args.metadata_only, 'declared_segmentation_mode': args.segmentation_mode,
         'models_used': False, 'mask_checks': mask_checks, 'blocking_reasons': blocking,
-        'render_gate': 'blocked' if blocking else (
-            'needs_visual_mask_validation' if args.mask else 'needs_segmentation_and_visual_validation'),
+        'render_gate': 'blocked' if blocking else 'input_metadata_ready',
         'reference_replication_verified': False,
         'notes': [
             'Metadata/geometry checks are not semantic foreground segmentation.',
-            'Inspect contact sheet and continuous motion before rendering.',
+            'Inspect relevant frames/motion only for uncertain regions or explicit visual debugging; metadata-only needs no contact sheet.',
             'No mask: do not substitute a luma threshold or fixed screen band.',
         ],
     }

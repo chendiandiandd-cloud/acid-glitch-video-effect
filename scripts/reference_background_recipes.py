@@ -92,7 +92,7 @@ class ReferenceBackgroundRecipes:
         else:
             raise ValueError('explicit requires mask; full_background forbids mask; unknown policy rejected')
         if tick != self.tick:
-            self.fluid = pigment_fold(self.xx, self.yy, tick)
+            self.fluid = None  # lazy; RNG below remains per-tick and independent
             self.light = (12,218,255) if tick%3 else (8,179,255)
             rng = np.random.default_rng(9210+tick)
             self.flecks = rng.random(alpha.shape) > .993
@@ -105,8 +105,12 @@ class ReferenceBackgroundRecipes:
             self.tick = tick
         kw = dict(color_order='BGR',dark_color=(2,3,4),light_color=self.light,
                   threshold=.48,transition_width=.06,halftone=self.halftone)
-        duo = background_state(bgr,'duotone',**kw)
-        fill = background_state(bgr,'ink_colorfield',color_field=self.fluid,**kw)
+        if state in ('ink_colorfield','horizontal_glitch','liquid_replace') and self.fluid is None:
+            self.fluid = pigment_fold(self.xx, self.yy, tick)
+        if state == 'duotone':
+            duo = background_state(bgr,'duotone',**kw)
+        if state in ('ink_colorfield','horizontal_glitch'):
+            fill = background_state(bgr,'ink_colorfield',color_field=self.fluid,**kw)
         if state == 'horizontal_glitch':
             glitch = fill.copy()
             safe = (alpha == 0) & (allowed == 1)
