@@ -8,3 +8,10 @@ __pycache__/
 temp_data/
 */temp_data/
 .DS_Store
+output/
+cache/
+.cache/
+.acid-render-*/
+*.log
+.git/
+**/__pycache__/

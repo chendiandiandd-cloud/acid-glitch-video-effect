@@ -1,92 +1,54 @@
 ---
 name: acid-glitch-video-effect
-description: 面向上传视频的参考驱动酸性故障与复古印刷特效技能，提供黄黑块面、过渡网点、细碎断墨、二维液化、分区故障及全画面自然色回闪的合成规则；包含可执行42帧时间控制、预检、缓存与数值测试，以及人像、动物、产品、风景、室内、动画和屏录的区域适配策略。适用于参考效果复刻、视频测试与Skill调优；轻量模型仅用于已授权的人物分割，不用生成模型、不创建工作台，停止生成时不补出片。当前不含获用户整体认可的完整渲染器。
+description: 参考驱动酸性故障与复古印刷离线视频处理，提供自包含CLI、五类背景配方、42帧全画面自然色回闪、人物软边合成与已有轻量多人ONNX缓存。适用于上传视频效果处理、全片或指定时段渲染、Skill调优；单次顺序解码、有限前瞻保持锚点插值，默认一次渲染直接交付、不追加质检或报告，不用生成模型、不创建工作台。跨素材适配仍是策略，不宣称完整复刻或所有类型已验证。
 author: "chenyanqi.1008"
 ---
 
-# 酸性故障 · 参考驱动离线处理
+# 酸性故障 · 离线处理
 
-## 目标与模式
-复刻固定原参考的视觉语言和时间结构，再按输入内容、比例、光照、运动和时长调整区域，不把街景人像模板硬套所有视频。
+## 默认执行链
+读取必要输入信息 → 一次正式渲染（其中按需复用/生成人物锚点缓存）→ FFmpeg正常退出并原子发布 → 直接交付。无渲染后质检轮次或报告。
 
-- 有明确生成/测试授权：离线处理上传视频，只交付授权长度MP4，不创建网站/工作台。
-- 当前持续测试约定：用户明确要求此特效每次优化后都交付一条新效果测试。修改完成先自检，再用当前指定素材生成一条4秒MP4并交付；没有新素材时沿用最近测试素材。仅请求测试时测试当前版本，不为出片额外改风格。
-- 用户明确暂停生成、只改不出片或撤回授权：只修改规则/代码并做无媒体结构与数值测试，不渲染、不补新媒体；暂停优先于持续约定。长度/素材/模型/成本范围变更另确认，持续约定不授权批量出片、新模型或无限重试。
-- 用户否定并要求重看参考：先复核参考及失败片；若随后实际完成优化且持续约定仍有效，交付一条新测试，不只贴测试数字，不重发旧片。
-- 轻量模型仅用于已授权人物检测/分割；其他语义模型先取得额外授权。禁止图像、视频、音乐生成模型。
-- 当前没有获用户整体认可的完整renderer。时间工具已实现不等于合成器已实现；策略覆盖不同视频类型不等于所有类型已通过实片验证。
+- 用户要求处理视频本身即授权该范围内处理及必要轻量人物分割，不重复索要生成授权；新增语义模型、付费或公开外发另确认范围。禁止图像/视频/音乐生成模型，不创建网站或工作台。
+- 不默认先出4秒/6秒预览。测试按本次明确长度；仅编辑/审查不出视频、不重新分割。旧“每次优化必出测试片”约定已取消，不沿用最近素材自动补片。
+- 默认不读取全部参考/截图、不额外抽接触表、不反复分析对照或试渲染、不跑全套单元测试、不完整播放或重复全片解码。仅参数缺失、输入异常或明确开发/调试任务时补必要步骤。
+- 使用固定[完整入口](scripts/render_video.py)，必填input/output，省略duration处理全片（start非零则处理剩余全片），没有4/6秒限制。入口自身解析包内路径，可从任意cwd以绝对脚本路径调用。
+- 入口一次ffprobe元数据检查加压缩包PTS审计（demux、不解码），拒绝VFR/non-grid PTS、非方形SAR、HDR与非直角旋转；CFR源PTS持续推进，效果时钟默认repeat。保留[独立预检工具](scripts/inspect_video.py)的metadata-only模式供仅审查时使用，不默认重复调用。
+- 输出真MP4/H.264，保留显示宽高与fps；偶数尺寸yuv420p，奇数尺寸yuv444p不缩放/补边/裁切（部分播放器兼容性较低）。音频兼容时copy，否则AAC；无音轨不添音乐。不再对输出运行ffprobe、二次duration比对、音包校验或全片解码；正常退出后直接交付。已有输出默认报错，显式overwrite才覆盖，始终禁止覆盖输入。
 
-## 已确认图片方向与真实背景配方
-读取 [图片映射指南](references/approved-image-guide.md) 与 [随包参考板](assets/reference-images/approved-board.png)：6张实图、5个唯一来源页；历史板4来源是笔误，随包板已纠正为5。原建筑参考优先，两类建筑仍缺外部强匹配，图片认可不等于renderer认可。
-
-使用 [背景配方](scripts/reference_background_recipes.py) 生成暗墨/亮平面、窄网点、有限宽色带二维回卷/分叉与当前印刷结构的局部横拉/切裂；再调用同包matte接口、最后whole-frame gate。代码无视频/缓存路径，不做建筑语义识别、不安排状态时钟、不编码；完整实验renderer不复制为通用入口。运行 [配方回归](scripts/test_reference_background_recipes.py) 验finite/shape/policy拒绝、局部采样保护与分支，视觉相似度另验。本轮仅背景校准，不重做人物matte、不跑新模型。
-
-## 分割边缘与酸性墨色
-用户最新明确否定分割与霓虹。保留可靠人物内部的黄黑块面、网点和断墨风格，但允许修正错误mask、边缘和跟随；不再冻结所有非零软支撑。旧baseline在软边混入旧背景，冻结它会留下亮壳/贴纸边，不能以“保护通过”继续保留。
-
-使用 [人物边缘合成工具](scripts/matte_composite.py)：可靠且alpha=1的核心复用approved，其余用独立人物印刷层与新背景按alpha合成；软边不得混旧baseline背景。检测/细化与合成分开验证，修正多人、小人、孔洞与缓存运动，禁止膨胀厚保护壳或整片模糊。自然gate仍优先选择当前完整自然分支。
-
-彩色液化先做不规则二维折叠/回卷与深墨块面，再组织有限主色的大色区；撤掉整套循环HSV彩虹、等距细霓虹带、发光描边和密集随机换色。有限配色与密度为校准策略，不是原参考测量；保留高饱和视觉冲击，不用全景降饱和代替设计。整体renderer仍待用户视觉验收。
-
-读取 [背景与建筑专项](references/background-structure.md)：追加8张截图后，撤回“摄影结构染色+小幅形变是背景主方案”。改为原景保留、双色印刷、建筑墨块叠彩色场、大范围液化替换、横向故障五类背景状态。建筑可图形化成深墨与亮块，也可在强替换时消失；不能始终保留摄影明暗。状态可分区共存，截图时间不是PTS，不机械排成固定轮换。
-
-[背景印刷状态工具](scripts/background_print_states.py) 实现数组状态分支；旧 [背景保护与结构工具](scripts/background_structure.py) 的非零支撑冻结接口仅适用于背景不污染且用户未否定的基准，不用于修正被否定的人物软边；当前人物修复用matte工具按核心/alpha分开合成。背景source恢复原景仍保留黄黑人物，与whole-frame natural_gate分开；后者优先选当前自然分支，包含人物/背景/近景。工具不是完整renderer，液化/故障场与动态仍需独立校准，额外语义模型仍需授权。
-
-## 背景接缝修复与主动自检
-固定画面高度裁切E会形成贯穿画面的水平接缝，不能再用“上半屏/49%高度”充当背景分割，也不能靠整片模糊掩盖。读取背景专项中的区域契约；使用 [背景区域工具](scripts/background_regions.py) 显式选择全背景处理或内容驱动的允许mask，区分可靠核心保护与待修正软边，保留关键保护物。全背景处理是主动选定的效果范围，不是准确语义分割；需要保留近景/文字/产品时必须使用相应保护或明确允许mask。
-
-修复实际调用路径而不只改说明。自检长横向mask硬跳变、首帧区域长期复用、采样越界/污染、液化过密、人物可靠核心逐字节保护、软边残留/泄漏与整画面回闪路由；发现关联问题直接修复并运行 [背景区域回归测试](scripts/test_background_regions.py)。mask诊断不用于否定参考中的艺术横向故障条带。遵循有效持续测试约定，优化后做无媒体回归并交付一条新4秒测试片；用户明确暂停时才不出片。数值通过与实际视觉验证分别汇报。
-
-## 先锁时间与颜色分支
-读取 [参考视觉证据](references/visual-spec.md)。完整参考42帧/8fps/5.25秒、无音轨。最关键结构是强处理之间短促整画面自然色回闪，不是人物始终黄黑、只换背景。
-
-[参考配置](references/reference-profile.json) 保存确认帧：F00是自然色基准，F02/F14/F17/F34/F38/F41是明显回闪。每个观测格0.125秒、不等间隔；高fps输出按这一时间采样，不只插1个输出帧。F06/F22/F25/F29局部回归不触发整画面gate。
-
-构建当前PTS源帧的strong与natural两个完整合成分支，顶层whole-frame gate选择；natural可保留校准残余断墨，但不能重新叠强黄黑。人物、近景与背景共同复色，不乘person mask。不根据回闪猜测旧帧重放，不机械套固定0.5秒轮换，不假设音频卡点。
-
-[时间工具](scripts/reference_timeline.py) 只返回颜色gate与参考格，不渲染：
+安装[依赖](requirements.txt)：`python3 -m pip install -r requirements.txt`，系统需FFmpeg/ffprobe。已有[人物权重及校验](models/README.md)随包，不自动下载。
 ```bash
-python3 -B scripts/reference_timeline.py --profile references/reference-profile.json --pts 0.25 --extension truncate
-python3 -B scripts/reference_timeline.py --profile references/reference-profile.json --pts 10.75 --extension repeat
+python3 -B scripts/render_video.py --input /absolute/input.mp4 --output /absolute/output.mp4
+python3 -B scripts/render_video.py --input /absolute/input.mp4 --output /absolute/range.mp4 --start 10 --duration 12
 ```
+默认segmentation auto复用有效缓存，缺锚点用既有轻量人物模型；cache-only禁止新推理；明确无需人物mask时用none（不是检测无人）。可指定model/cache-dir，缓存默认系统临时目录。stdout默认只返回一行output路径JSON，不构建/写盘统计或质检报告；显式--diagnostics仅复用渲染中已有便宜计数/耗时输出开发JSON，不增加输出探测或解码。非帧栅格时段按区间内源PTS选帧，实际起止及帧量化时长仅在diagnostics中提供；不循环源画面。
 
-显式选择truncate（仅[0,5.25)）或repeat（长片循环效果，不循环源PTS）。超过参考时长是适配推断，不能当参考事实。低fps可能漏采脉冲，记录限制，不静默改fps或脉宽。
+## 风格与时间硬约束
+- 黄黑实块优先，窄中间调网点、细碎锐利断墨/划痕/稀疏白点；避免整脸砂纸、乳白云雾/霉斑。磨损随内容运动，印刷/故障可跳动，不全锁屏或全机械光流平移。
+- 背景五状态：source原景、duotone双色、ink_colorfield墨块叠彩色场、liquid_replace大范围二维液化替换、horizontal_glitch局部横拉切裂。建筑不是永久保护对象，状态可分区共存，不机械均匀轮换。
+- 液化先组织不规则折叠/回卷/分叉和深墨，再有限主色大色区；禁止整套HSV彩虹、等距霓虹细带、发光描边和整屏随机RGB。不以全景降饱和替代设计；艺术横断不同于固定高度mask接缝。
+- [时间配置](references/reference-profile.json)：参考42帧/8fps/5.25秒，无音轨。F00自然基准；F02/F14/F17/F34/F38/F41整画面复色，各观测格0.125秒；F06/F22/F25/F29仅局部回归。高fps按PTS采样，不只插一帧；低fps漏采注明限制，不改fps/脉宽。
+- 用 [时间查表](scripts/reference_timeline.py) 在[0,5.25)选truncate，超过5.25秒选repeat：只repeat效果时钟，源PTS持续推进。长片循环是适配推断，不是参考事实。
+- strong/natural均来自当前PTS完整画面；顶层whole-frame gate同时复色人物/近景/背景，gate后不再叠强黄黑。背景source仍可保持黄黑人物，不能冒充整画面回闪。
 
-## 再按素材确定区域
-读取 [跨素材适配](references/adaptation.md) 与 [合成实现/性能](references/implementation.md)。独立定义主体S、近景N、可编辑E、保护P、染色T和印刷I；I不等于person mask，E也不自动等于1-person_mask。保护指保留辨识，不是强制主体永久原色。
+## 区域与人物规则
+- 主体S、近景N、可编辑E、保护P、染色T、印刷I分别定义；E不自动等于1-person mask，I不限人物。保护保辨识和关键文字，不禁止自然gate复色。
+- 多人取全部实例并集，包括远处/边缘小人。可靠且alpha=1核心保留认可印刷基准；软边用独立人物印刷层与新背景alpha合成，不冻结混旧背景的非零支撑，不膨胀厚壳/整片模糊。
+- 缓存不因颜色/做旧/节奏调参失效；源、模型、分割配置、几何或时序变化才检查失效。快运动、新露出、遮挡及切镜按需更新；切镜清空间/光流历史，默认不重置全局效果时钟。
+- 无人物/无天空允许；动物、产品、风景、室内、动画、屏录按区域策略处理，未经授权不引入非人语义模型。候选不可靠则受限印刷/染色/形变并注明风险，不冒称准确分割或已验证泛化。
 
-- 多人合并全部person mask，包含远处和边缘人物，不只保留最大实例。
-- 动物、产品、无人物风景、室内、动画与文字视频使用相应区域策略；无人物不是失败，无天空不是无可编辑区。
-- 区域不可靠时记录风险，降级为整景印刷、受限染色/形变与全画面回闪，不声称传统候选是准确语义分割。
-- 切镜重建区域/曝光、清空光流与mask历史，默认不重置全局效果时钟；尊重横竖比例、旋转、VFR的真实PTS。
-- 已认可分割缓存不因颜色/磨损/节奏调参失效。快速运动/新露出/遮挡变化须检查缓存质量。
+## 包内实装与按需资源
+| 内容 | 实际边界 / 何时加载 |
+| --- | --- |
+| [背景配方](scripts/reference_background_recipes.py) / [状态选择](scripts/background_print_states.py) | NumPy数组双色、墨填色、宽带二维回卷/分叉、当前印刷结构局部横断；无识别、状态时钟或编码 |
+| [人物合成](scripts/matte_composite.py) | 核心保护、软边混新层、完整natural优先；不检测/细化mask |
+| [区域工具](scripts/background_regions.py) / [旧保护采样](scripts/background_structure.py) | 显式范围、mask接缝诊断、有界采样；旧P>0冻结只用于无污染基准，不修软边 |
+| [数组指标](scripts/quality_metrics.py) | 全人物mask合并、泄漏/覆盖、缓存键与实测参数耗时估算；不管理缓存、不打美学分 |
+| [实现/开发](references/implementation.md) | 完整链来源、缓存/PTS/有限前瞻契约、实测验证和限制；仅接入/调试时读 |
+| [跨素材策略](references/adaptation.md) | 新类型、复杂运动/曝光/几何时读；不是已验证的自动路由 |
+| [视觉证据](references/visual-spec.md) / [背景专项](references/background-structure.md) | 用户要求复核参考或调风格时读，不默认重新审计 |
+| [图片映射](references/approved-image-guide.md) / [参考板](assets/reference-images/approved-board.png) | 视觉开发按需；6图5来源页，建筑强匹配缺口仍在 |
+| [专项验收](references/acceptance.md) | 用户明确视觉评审/开发调试时读；数值通过不代表视觉通过 |
 
-[预检脚本](scripts/inspect_video.py) 的metadata-only不抽帧、不分割、不渲染：
-```bash
-python3 scripts/inspect_video.py "输入视频.mp4" --output-dir /tmp/acid-preflight --metadata-only --segmentation-mode lightweight
-```
-
-无mask保持待检查；已有mask可用--mask检查几何/时序。
-
-## 风格顺序与失败反例
-1. 干净高饱和黄面和扎实黑位，窄中间调区网点；不把整脸铺成砂纸。
-2. 先做显著二维折叠/回卷/涡旋大形，再做内部彩色细带；一角机械平行波纹不是目标。
-3. 做旧是细碎锐利断墨、细长划痕与稀疏白点；低频包络仅调密度，不画乳白云雾/霉斑。
-4. 五类背景状态独立：建筑双色墨块与彩色填充、局部原景恢复、大范围液化替换、横向故障分层。建筑并非永久保护对象；天空局部可有密集彩色颗粒，但整屏均匀RGB雪花不能替代分层印刷。
-5. 区分内容随动与印刷/故障跳动，不全锁屏，也不全机械光流平移。
-
-[数组工具](scripts/quality_metrics.py) 提供mask合并、区域泄漏/覆盖、缓存键和耗时估算；wear_region_contrast不是参考美学目标，不为提高分数造灰斑。
-
-## 验证与交付
-按 [验收规则](references/acceptance.md) 先验回闪，再验区域、大形与纹理；原参考并排对照后分别完整播放。分割合格、时间gate正确、元素齐全或MP4可解码，都不能单独证明还原。
-
-无媒体测试：[人物边缘测试](scripts/test_matte_composite.py)、[背景状态测试](scripts/test_background_print_states.py)、[背景保护与结构测试](scripts/test_background_structure.py)、[时间测试](scripts/test_reference_timeline.py)、[数组测试](scripts/test_quality_metrics.py)、[预检模拟](scripts/test_inspect_video.py)。时间与预检仅标准库，背景与数组需NumPy。
-```bash
-python3 -B -m unittest discover -s scripts -p 'test_*.py' -v
-```
-
-有生成授权时才估算实测成本并渲染；降低分辨率/fps或截短须符合授权。输出真MP4/H.264，保持约定时长、显示比例和源音轨，不发布到网站。
-
-修改Skill只在当前本地草稿生效；草稿期间暂停同步空间版本，直到上传或废弃退出草稿后恢复。用户明确要求后才上传。不贴旧片，不承诺完整复刻或所有类型已验证。
-
-所有相对路径和命令均以Skill根目录为基准。
+所有有效测试脚本与参考资产保留原位，仅按需开发/调试加载执行。包内已有完整可移植运行链，当前美学仍为既有实验基准，不承诺整体视觉认可、完整复刻或全部素材类型已验证。
+修改仅在本地草稿生效；草稿暂停空间自动同步，上传或废弃退出后恢复；仅用户明确要求才上传。相对路径/命令以本Skill根目录为基准。

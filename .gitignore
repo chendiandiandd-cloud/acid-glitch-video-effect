@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+temp_data/
+output/
+cache/
+.cache/
+.acid-render-*/
+*.log

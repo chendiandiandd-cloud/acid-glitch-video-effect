@@ -1,0 +1,5 @@
+# Python >=3.10; FFmpeg/ffprobe >=5 installed separately on PATH.
+numpy>=1.24,<3
+opencv-python-headless>=4.8,<5
+# Required only for --segmentation auto when an anchor is not cached.
+onnxruntime>=1.16,<2
