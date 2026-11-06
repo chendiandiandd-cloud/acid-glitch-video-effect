@@ -16,7 +16,7 @@ author: "chenyanqi.1008"
 - 入口一次ffprobe元数据检查加压缩包PTS审计（demux、不解码），拒绝VFR/non-grid PTS、非方形SAR、HDR与非直角旋转；CFR源PTS持续推进，效果时钟默认repeat。保留[独立预检工具](scripts/inspect_video.py)的metadata-only模式供仅审查时使用，不默认重复调用。
 - 输出真MP4/H.264，保留显示宽高与fps；偶数尺寸yuv420p，奇数尺寸yuv444p不缩放/补边/裁切（部分播放器兼容性较低）。音频兼容时copy，否则AAC；无音轨不添音乐。不再对输出运行ffprobe、二次duration比对、音包校验或全片解码；正常退出后直接交付。已有输出默认报错，显式overwrite才覆盖，始终禁止覆盖输入。
 
-安装[依赖](requirements.txt)：`python3 -m pip install -r requirements.txt`，系统需FFmpeg/ffprobe。已有[人物权重及校验](models/README.md)随包，不自动下载。
+运行基线为CPython 3.11（已测Linux x86_64）；使用独立venv后执行 `python3 -m pip install -r requirements.txt` 安装[锁定依赖](requirements.txt)。其他Python版本（含3.13+）不在此锁定组合支持范围；其他OS/架构需确认原生wheel/库可用，不宣称手机本机支持。系统FFmpeg/ffprobe>=5（含libx264）必须另装并加入PATH，pip不提供；入口仅做轻量依赖缺失/版本护栏，不自动安装、替换系统或增加质检轮次。已有[人物权重及校验](models/README.md)随包，不自动下载。
 ```bash
 python3 -B scripts/render_video.py --input /absolute/input.mp4 --output /absolute/output.mp4
 python3 -B scripts/render_video.py --input /absolute/input.mp4 --output /absolute/range.mp4 --start 10 --duration 12
@@ -51,4 +51,4 @@ python3 -B scripts/render_video.py --input /absolute/input.mp4 --output /absolut
 | [专项验收](references/acceptance.md) | 用户明确视觉评审/开发调试时读；数值通过不代表视觉通过 |
 
 所有有效测试脚本与参考资产保留原位，仅按需开发/调试加载执行。包内已有完整可移植运行链，当前美学仍为既有实验基准，不承诺整体视觉认可、完整复刻或全部素材类型已验证。
-修改仅在本地草稿生效；草稿暂停空间自动同步，上传或废弃退出后恢复；仅用户明确要求才上传。相对路径/命令以本Skill根目录为基准。
+仅在AIME等支持草稿/空间同步机制的宿主中：修改只在本地草稿生效，草稿暂停空间自动同步，上传或废弃退出后恢复；其他平台按各自管理机制执行。仅用户明确要求才上传。相对路径/命令以本Skill根目录为基准。

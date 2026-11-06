@@ -1,5 +1,8 @@
-# Python >=3.10; FFmpeg/ffprobe >=5 installed separately on PATH.
-numpy>=1.24,<3
-opencv-python-headless>=4.8,<5
-# Required only for --segmentation auto when an anchor is not cached.
-onnxruntime>=1.16,<2
+# Supported/tested baseline: CPython 3.11, Linux x86_64.
+# Other Python versions (including 3.13+) are outside this lock's support scope.
+# Wheels/native libraries are OS/architecture-specific; do not assume mobile support.
+# FFmpeg/ffprobe >=5 with libx264 must be installed separately on PATH, not by pip.
+numpy==1.26.4
+opencv-python-headless==4.11.0.86
+# Native ORT is loaded only for auto segmentation on a cache miss.
+onnxruntime==1.16.3
